@@ -32,6 +32,7 @@ class CallService : InCallService() {
     private val proximitySensor by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) }
     private var proximityWakeLock: PowerManager.WakeLock? = null
     private var pendingRouteChange: Runnable? = null
+    private var currentAudioState: CallAudioState? = null
 
     private val callListener = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) {
@@ -103,6 +104,7 @@ class CallService : InCallService() {
     override fun onCallAudioStateChanged(audioState: CallAudioState?) {
         super.onCallAudioStateChanged(audioState)
         if (audioState != null) {
+            currentAudioState = audioState
             CallManager.onAudioStateChanged(audioState)
         }
     }
@@ -144,11 +146,11 @@ class CallService : InCallService() {
             val isNear = distance == 0f || distance < maximumRange
             pendingRouteChange?.let(mainHandler::removeCallbacks)
             pendingRouteChange = Runnable {
-                val route = callAudioState?.route
+                val route = currentAudioState?.route
                 if (route == CallAudioState.ROUTE_BLUETOOTH || route == CallAudioState.ROUTE_WIRED_HEADSET) {
                     return@Runnable
                 }
-                setAudioRoute(if (isNear) CallAudioState.ROUTE_EARPIECE else CallAudioState.ROUTE_SPEAKER)
+                CallManager.setSpeakerEnabled(!isNear)
             }
             mainHandler.postDelayed(pendingRouteChange!!, 300L)
         }
