@@ -497,9 +497,9 @@ class CallActivity : SimpleActivity() {
             toggleButtonColor(binding.callToggleSpeaker, enabled = route != AudioRoute.EARPIECE && route != AudioRoute.WIRED_HEADSET)
             createOrUpdateAudioRouteChooser(supportedAudioRoutes, create = false)
 
-            val externalAudioRoute = when {
-                supportedAudioRoutes.contains(AudioRoute.BLUETOOTH) -> AudioRoute.BLUETOOTH
-                supportedAudioRoutes.contains(AudioRoute.WIRED_HEADSET) -> AudioRoute.WIRED_HEADSET
+            val externalAudioRoute = when (route) {
+                AudioRoute.BLUETOOTH -> AudioRoute.BLUETOOTH
+                AudioRoute.WIRED_HEADSET -> AudioRoute.WIRED_HEADSET
                 else -> null
             }
             if (route == AudioRoute.SPEAKER && externalAudioRoute != null) {
@@ -520,13 +520,13 @@ class CallActivity : SimpleActivity() {
             return
         }
 
-        val supportedRoutes = CallManager.getSupportedAudioRoutes()
-        if (supportedRoutes.contains(AudioRoute.BLUETOOTH) || supportedRoutes.contains(AudioRoute.WIRED_HEADSET)) {
+        val currentRoute = CallManager.getCallAudioRoute()
+        if (currentRoute == AudioRoute.BLUETOOTH || currentRoute == AudioRoute.WIRED_HEADSET) {
             return
         }
 
         val desiredRoute = if (isNear) CallAudioState.ROUTE_EARPIECE else CallAudioState.ROUTE_SPEAKER
-        if (CallManager.getCallAudioRoute()?.route != desiredRoute) {
+        if (currentRoute?.route != desiredRoute) {
             CallManager.setAudioRoute(desiredRoute)
         }
     }
