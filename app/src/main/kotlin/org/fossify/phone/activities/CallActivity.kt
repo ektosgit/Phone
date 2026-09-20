@@ -525,11 +525,11 @@ class CallActivity : SimpleActivity() {
             return
         }
 
-        val supportedRoutes = CallManager.getSupportedAudioRoutes()
-        val earpieceRoute = supportedRoutes.firstOrNull {
-            it == AudioRoute.EARPIECE || it == AudioRoute.WIRED_OR_EARPIECE
-        }?.route ?: CallAudioState.ROUTE_EARPIECE
-        val desiredRoute = if (isNear) earpieceRoute else CallAudioState.ROUTE_SPEAKER
+        val desiredRoute = if (isNear) {
+            CallAudioState.ROUTE_WIRED_OR_EARPIECE
+        } else {
+            CallAudioState.ROUTE_SPEAKER
+        }
         if (currentRoute?.route != desiredRoute) {
             CallManager.setAudioRoute(desiredRoute)
         }
@@ -537,7 +537,9 @@ class CallActivity : SimpleActivity() {
 
     private val proximityListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-            val isNear = event.values.firstOrNull()?.let { it < (proximitySensor?.maximumRange ?: 0f) } ?: return
+            val distance = event.values.firstOrNull() ?: return
+            val maximumRange = proximitySensor?.maximumRange ?: return
+            val isNear = distance == 0f || distance < maximumRange
             proximityRouteTask?.let(callDurationHandler::removeCallbacks)
             proximityRouteTask = Runnable { updateAutomaticAudioRoute(isNear) }
             callDurationHandler.postDelayed(proximityRouteTask!!, 300L)
