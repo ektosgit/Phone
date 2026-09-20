@@ -115,6 +115,10 @@ class CallManager {
             inCallService?.setAudioRoute(newRoute)
         }
 
+        fun setSpeakerEnabled(enabled: Boolean) {
+            setAudioRoute(if (enabled) CallAudioState.ROUTE_SPEAKER else CallAudioState.ROUTE_WIRED_OR_EARPIECE)
+        }
+
         private fun updateState() {
             val primaryCall = when (val phoneState = getPhoneState()) {
                 is NoCall -> null
