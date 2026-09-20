@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Foss debug APK
+    name: Build Ektogit release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -30,12 +30,34 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build APK
-        run: ./gradlew assembleFossDebug --no-daemon
+        run: ./gradlew assembleFossRelease --no-daemon
+
+      - name: Sign APK
+        env:
+          KEYSTORE_PASSWORD: ektogit-build-password
+          KEY_PASSWORD: ektogit-key-password
+        run: |
+          keytool -genkeypair -v \
+            -keystore ektogit.keystore \
+            -alias ektogit \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -dname "CN=Ektogit, O=Ektogit, C=XX"
+          apksigner sign \
+            --ks ektogit.keystore \
+            --ks-key-alias ektogit \
+            --ks-pass pass:"$KEYSTORE_PASSWORD" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            --out app/build/outputs/apk/foss/release/phone-ektogit-release.apk \
+            app/build/outputs/apk/foss/release/*.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ektogit-phone-debug
-          path: app/build/outputs/apk/foss/debug/*.apk
+          name: ektogit-phone-release
+          path: app/build/outputs/apk/foss/release/phone-ektogit-release.apk
           if-no-files-found: error
           retention-days: 14
