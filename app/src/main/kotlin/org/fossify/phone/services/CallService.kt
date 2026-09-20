@@ -10,7 +10,6 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import org.fossify.commons.extensions.canUseFullScreenIntent
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_POST_NOTIFICATIONS
@@ -30,7 +29,6 @@ class CallService : InCallService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val sensorManager by lazy { getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     private val proximitySensor by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) }
-    private var proximityWakeLock: PowerManager.WakeLock? = null
     private var pendingRouteChange: Runnable? = null
     private var currentAudioState: CallAudioState? = null
 
@@ -113,14 +111,6 @@ class CallService : InCallService() {
         if (!config.automaticSpeakerByProximity) {
             return
         }
-        if (!config.disableProximitySensor && proximityWakeLock?.isHeld != true) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            proximityWakeLock = powerManager.newWakeLock(
-                PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
-                "org.fossify.phone:service_wake_lock"
-            )
-            proximityWakeLock?.acquire(60 * 60 * 1000L)
-        }
         proximitySensor?.let {
             sensorManager.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
@@ -130,10 +120,6 @@ class CallService : InCallService() {
         sensorManager.unregisterListener(proximityListener)
         pendingRouteChange?.let(mainHandler::removeCallbacks)
         pendingRouteChange = null
-        if (proximityWakeLock?.isHeld == true) {
-            proximityWakeLock?.release()
-        }
-        proximityWakeLock = null
     }
 
     private val proximityListener = object : SensorEventListener {
