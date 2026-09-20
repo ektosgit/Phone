@@ -3,6 +3,14 @@ package org.fossify.phone.services
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import org.fossify.commons.extensions.canUseFullScreenIntent
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_POST_NOTIFICATIONS
@@ -19,6 +27,11 @@ import org.greenrobot.eventbus.EventBus
 
 class CallService : InCallService() {
     private val callNotificationManager by lazy { CallNotificationManager(this) }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val sensorManager by lazy { getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    private val proximitySensor by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) }
+    private var proximityWakeLock: PowerManager.WakeLock? = null
+    private var pendingRouteChange: Runnable? = null
 
     private val callListener = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) {
@@ -35,6 +48,7 @@ class CallService : InCallService() {
         super.onCallAdded(call)
         CallManager.onCallAdded(call)
         CallManager.inCallService = this
+        startAutomaticSpeakerRouting()
         call.registerCallback(callListener)
 
         // Incoming/Outgoing (locked): high priority (FSI)
@@ -71,6 +85,9 @@ class CallService : InCallService() {
         val wasPrimaryCall = call == CallManager.getPrimaryCall()
         CallManager.onCallRemoved(call)
         if (CallManager.getPhoneState() == NoCall) {
+            stopAutomaticSpeakerRouting()
+        }
+        if (CallManager.getPhoneState() == NoCall) {
             CallManager.inCallService = null
             callNotificationManager.cancelNotification()
         } else {
@@ -90,7 +107,57 @@ class CallService : InCallService() {
         }
     }
 
+    private fun startAutomaticSpeakerRouting() {
+        if (!config.automaticSpeakerByProximity) {
+            return
+        }
+        if (!config.disableProximitySensor && proximityWakeLock?.isHeld != true) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            proximityWakeLock = powerManager.newWakeLock(
+                PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
+                "org.fossify.phone:service_wake_lock"
+            )
+            proximityWakeLock?.acquire(60 * 60 * 1000L)
+        }
+        proximitySensor?.let {
+            sensorManager.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+    }
+
+    private fun stopAutomaticSpeakerRouting() {
+        sensorManager.unregisterListener(proximityListener)
+        pendingRouteChange?.let(mainHandler::removeCallbacks)
+        pendingRouteChange = null
+        if (proximityWakeLock?.isHeld == true) {
+            proximityWakeLock?.release()
+        }
+        proximityWakeLock = null
+    }
+
+    private val proximityListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (!config.automaticSpeakerByProximity || CallManager.getState() != Call.STATE_ACTIVE) {
+                return
+            }
+            val distance = event.values.firstOrNull() ?: return
+            val maximumRange = proximitySensor?.maximumRange ?: return
+            val isNear = distance == 0f || distance < maximumRange
+            pendingRouteChange?.let(mainHandler::removeCallbacks)
+            pendingRouteChange = Runnable {
+                val route = callAudioState?.route
+                if (route == CallAudioState.ROUTE_BLUETOOTH || route == CallAudioState.ROUTE_WIRED_HEADSET) {
+                    return@Runnable
+                }
+                setAudioRoute(if (isNear) CallAudioState.ROUTE_EARPIECE else CallAudioState.ROUTE_SPEAKER)
+            }
+            mainHandler.postDelayed(pendingRouteChange!!, 300L)
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
     override fun onDestroy() {
+        stopAutomaticSpeakerRouting()
         super.onDestroy()
         callNotificationManager.cancelNotification()
     }
