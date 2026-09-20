@@ -525,7 +525,11 @@ class CallActivity : SimpleActivity() {
             return
         }
 
-        val desiredRoute = if (isNear) CallAudioState.ROUTE_EARPIECE else CallAudioState.ROUTE_SPEAKER
+        val supportedRoutes = CallManager.getSupportedAudioRoutes()
+        val earpieceRoute = supportedRoutes.firstOrNull {
+            it == AudioRoute.EARPIECE || it == AudioRoute.WIRED_OR_EARPIECE
+        }?.route ?: CallAudioState.ROUTE_EARPIECE
+        val desiredRoute = if (isNear) earpieceRoute else CallAudioState.ROUTE_SPEAKER
         if (currentRoute?.route != desiredRoute) {
             CallManager.setAudioRoute(desiredRoute)
         }
