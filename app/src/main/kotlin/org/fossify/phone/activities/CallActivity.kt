@@ -7,6 +7,10 @@ import android.content.Intent
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.media.AudioManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -56,6 +60,9 @@ class CallActivity : SimpleActivity() {
     private var isCallEnded = false
     private var callContact: CallContact? = null
     private var proximityWakeLock: PowerManager.WakeLock? = null
+    private val sensorManager by lazy { getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    private val proximitySensor by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) }
+    private var proximityRouteTask: Runnable? = null
     private var screenOnWakeLock: PowerManager.WakeLock? = null
     private var callDuration = 0
     private val callDurationHandler = Handler(Looper.getMainLooper())
@@ -490,12 +497,49 @@ class CallActivity : SimpleActivity() {
             toggleButtonColor(binding.callToggleSpeaker, enabled = route != AudioRoute.EARPIECE && route != AudioRoute.WIRED_HEADSET)
             createOrUpdateAudioRouteChooser(supportedAudioRoutes, create = false)
 
-            if (isSpeakerOn) {
+            val externalAudioRoute = when {
+                supportedAudioRoutes.contains(AudioRoute.BLUETOOTH) -> AudioRoute.BLUETOOTH
+                supportedAudioRoutes.contains(AudioRoute.WIRED_HEADSET) -> AudioRoute.WIRED_HEADSET
+                else -> null
+            }
+            if (route == AudioRoute.SPEAKER && externalAudioRoute != null) {
+                CallManager.setAudioRoute(externalAudioRoute.route)
+            }
+
+            val hasExternalAudioRoute = externalAudioRoute != null
+            if (hasExternalAudioRoute) {
                 disableProximitySensor()
             } else {
                 enableProximitySensor()
             }
         }
+    }
+
+    private fun updateAutomaticAudioRoute(isNear: Boolean) {
+        if (!config.automaticSpeakerByProximity || CallManager.getState() != Call.STATE_ACTIVE) {
+            return
+        }
+
+        val supportedRoutes = CallManager.getSupportedAudioRoutes()
+        if (supportedRoutes.contains(AudioRoute.BLUETOOTH) || supportedRoutes.contains(AudioRoute.WIRED_HEADSET)) {
+            return
+        }
+
+        val desiredRoute = if (isNear) CallAudioState.ROUTE_EARPIECE else CallAudioState.ROUTE_SPEAKER
+        if (CallManager.getCallAudioRoute()?.route != desiredRoute) {
+            CallManager.setAudioRoute(desiredRoute)
+        }
+    }
+
+    private val proximityListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            val isNear = event.values.firstOrNull()?.let { it < (proximitySensor?.maximumRange ?: 0f) } ?: return
+            proximityRouteTask?.let(callDurationHandler::removeCallbacks)
+            proximityRouteTask = Runnable { updateAutomaticAudioRoute(isNear) }
+            callDurationHandler.postDelayed(proximityRouteTask!!, 300L)
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
     }
 
     private fun toggleMicrophone() {
@@ -861,9 +905,15 @@ class CallActivity : SimpleActivity() {
             proximityWakeLock = powerManager.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "org.fossify.phone:wake_lock")
             proximityWakeLock!!.acquire(60 * MINUTE_SECONDS * 1000L)
         }
+        if (config.automaticSpeakerByProximity) {
+            proximitySensor?.let { sensorManager.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_NORMAL) }
+        }
     }
 
     private fun disableProximitySensor() {
+        sensorManager.unregisterListener(proximityListener)
+        proximityRouteTask?.let(callDurationHandler::removeCallbacks)
+        proximityRouteTask = null
         if (proximityWakeLock?.isHeld == true) {
             proximityWakeLock!!.release()
         }
