@@ -112,6 +112,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getBoolean(DISABLE_PROXIMITY_SENSOR, false)
         set(disableProximitySensor) = prefs.edit().putBoolean(DISABLE_PROXIMITY_SENSOR, disableProximitySensor).apply()
 
+    var automaticSpeakerByProximity: Boolean
+        get() = prefs.getBoolean(AUTOMATIC_SPEAKER_BY_PROXIMITY, true)
+        set(automaticSpeakerByProximity) = prefs.edit().putBoolean(AUTOMATIC_SPEAKER_BY_PROXIMITY, automaticSpeakerByProximity).apply()
+
     var disableSwipeToAnswer: Boolean
         get() = prefs.getBoolean(DISABLE_SWIPE_TO_ANSWER, false)
         set(disableSwipeToAnswer) = prefs.edit().putBoolean(DISABLE_SWIPE_TO_ANSWER, disableSwipeToAnswer).apply()
