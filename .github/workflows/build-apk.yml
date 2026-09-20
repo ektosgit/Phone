@@ -33,24 +33,24 @@ jobs:
         run: ./gradlew assembleFossRelease --no-daemon
 
       - name: Sign APK
-        env:
-          KEYSTORE_PASSWORD: ektogit-build-password
-          KEY_PASSWORD: ektogit-key-password
         run: |
+          SIGNING_PASSWORD="$(openssl rand -base64 32)"
           keytool -genkeypair -v \
             -keystore ektogit.keystore \
+            -storetype JKS \
             -alias ektogit \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" \
+            -storepass "$SIGNING_PASSWORD" \
+            -keypass "$SIGNING_PASSWORD" \
             -dname "CN=Ektogit, O=Ektogit, C=XX"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
             --ks ektogit.keystore \
+            --ks-type JKS \
             --ks-key-alias ektogit \
-            --ks-pass pass:"$KEYSTORE_PASSWORD" \
-            --key-pass pass:"$KEY_PASSWORD" \
+            --ks-pass pass:"$SIGNING_PASSWORD" \
+            --key-pass pass:"$SIGNING_PASSWORD" \
             --out app/build/outputs/apk/foss/release/phone-ektogit-release.apk \
             app/build/outputs/apk/foss/release/*.apk
 
