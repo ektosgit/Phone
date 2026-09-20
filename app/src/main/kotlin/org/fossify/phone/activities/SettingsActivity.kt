@@ -113,6 +113,7 @@ class SettingsActivity : SimpleActivity() {
         setupDialpadBeeps()
         setupShowCallConfirmation()
         setupDisableProximitySensor()
+        setupAutomaticSpeakerByProximity()
         setupDisableSwipeToAnswer()
         setupAlwaysShowFullscreen()
         setupCallsExport()
@@ -367,6 +368,16 @@ class SettingsActivity : SimpleActivity() {
             settingsDisableProximitySensorHolder.setOnClickListener {
                 settingsDisableProximitySensor.toggle()
                 config.disableProximitySensor = settingsDisableProximitySensor.isChecked
+            }
+        }
+    }
+
+    private fun setupAutomaticSpeakerByProximity() {
+        binding.apply {
+            settingsAutomaticSpeakerByProximity.isChecked = config.automaticSpeakerByProximity
+            settingsAutomaticSpeakerByProximityHolder.setOnClickListener {
+                settingsAutomaticSpeakerByProximity.toggle()
+                config.automaticSpeakerByProximity = settingsAutomaticSpeakerByProximity.isChecked
             }
         }
     }
