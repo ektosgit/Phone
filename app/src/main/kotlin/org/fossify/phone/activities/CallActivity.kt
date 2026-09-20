@@ -438,8 +438,7 @@ class CallActivity : SimpleActivity() {
             createOrUpdateAudioRouteChooser(supportAudioRoutes)
         } else {
             val isSpeakerOn = !isSpeakerOn
-            val newRoute = if (isSpeakerOn) CallAudioState.ROUTE_SPEAKER else CallAudioState.ROUTE_WIRED_OR_EARPIECE
-            CallManager.setAudioRoute(newRoute)
+            CallManager.setSpeakerEnabled(isSpeakerOn)
         }
     }
 
