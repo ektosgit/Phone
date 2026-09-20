@@ -7,10 +7,6 @@ import android.content.Intent
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.media.AudioManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -60,9 +56,6 @@ class CallActivity : SimpleActivity() {
     private var isCallEnded = false
     private var callContact: CallContact? = null
     private var proximityWakeLock: PowerManager.WakeLock? = null
-    private val sensorManager by lazy { getSystemService(Context.SENSOR_SERVICE) as SensorManager }
-    private val proximitySensor by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) }
-    private var proximityRouteTask: Runnable? = null
     private var screenOnWakeLock: PowerManager.WakeLock? = null
     private var callDuration = 0
     private val callDurationHandler = Handler(Looper.getMainLooper())
@@ -515,39 +508,6 @@ class CallActivity : SimpleActivity() {
         }
     }
 
-    private fun updateAutomaticAudioRoute(isNear: Boolean) {
-        if (!config.automaticSpeakerByProximity || CallManager.getState() != Call.STATE_ACTIVE) {
-            return
-        }
-
-        val currentRoute = CallManager.getCallAudioRoute()
-        if (currentRoute == AudioRoute.BLUETOOTH || currentRoute == AudioRoute.WIRED_HEADSET) {
-            return
-        }
-
-        val desiredRoute = if (isNear) {
-            CallAudioState.ROUTE_WIRED_OR_EARPIECE
-        } else {
-            CallAudioState.ROUTE_SPEAKER
-        }
-        if (currentRoute?.route != desiredRoute) {
-            CallManager.setAudioRoute(desiredRoute)
-        }
-    }
-
-    private val proximityListener = object : SensorEventListener {
-        override fun onSensorChanged(event: SensorEvent) {
-            val distance = event.values.firstOrNull() ?: return
-            val maximumRange = proximitySensor?.maximumRange ?: return
-            val isNear = distance == 0f || distance < maximumRange
-            proximityRouteTask?.let(callDurationHandler::removeCallbacks)
-            proximityRouteTask = Runnable { updateAutomaticAudioRoute(isNear) }
-            callDurationHandler.postDelayed(proximityRouteTask!!, 300L)
-        }
-
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-    }
-
     private fun toggleMicrophone() {
         isMicrophoneOff = !isMicrophoneOff
         audioManager.isMicrophoneMute = isMicrophoneOff
@@ -911,15 +871,9 @@ class CallActivity : SimpleActivity() {
             proximityWakeLock = powerManager.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "org.fossify.phone:wake_lock")
             proximityWakeLock!!.acquire(60 * MINUTE_SECONDS * 1000L)
         }
-        if (config.automaticSpeakerByProximity) {
-            proximitySensor?.let { sensorManager.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_NORMAL) }
-        }
     }
 
     private fun disableProximitySensor() {
-        sensorManager.unregisterListener(proximityListener)
-        proximityRouteTask?.let(callDurationHandler::removeCallbacks)
-        proximityRouteTask = null
         if (proximityWakeLock?.isHeld == true) {
             proximityWakeLock!!.release()
         }
