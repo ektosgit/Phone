@@ -46,7 +46,7 @@ jobs:
             -storepass "$KEYSTORE_PASSWORD" \
             -keypass "$KEY_PASSWORD" \
             -dname "CN=Ektogit, O=Ektogit, C=XX"
-          apksigner sign \
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
             --ks ektogit.keystore \
             --ks-key-alias ektogit \
             --ks-pass pass:"$KEYSTORE_PASSWORD" \
