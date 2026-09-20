@@ -341,6 +341,21 @@
             </RelativeLayout>
 
             <RelativeLayout
+                android:id="@+id/settings_automatic_speaker_by_proximity_holder"
+                style="@style/SettingsHolderSwitchStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyMaterialSwitch
+                    android:id="@+id/settings_automatic_speaker_by_proximity"
+                    style="@style/SettingsSwitchStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/automatic_speaker_by_proximity" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
                 android:id="@+id/settings_disable_swipe_to_answer_holder"
                 style="@style/SettingsHolderSwitchStyle"
                 android:layout_width="match_parent"
